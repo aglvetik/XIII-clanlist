@@ -1,0 +1,15 @@
+[Unit]
+Description=Discord Roster Bot
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/discord-roster-bot
+EnvironmentFile=/opt/discord-roster-bot/.env
+ExecStart=/opt/discord-roster-bot/.venv/bin/python run.py
+Restart=always
+RestartSec=5
+User=discordbot
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,1 @@
+"""Discord roster bot package."""
