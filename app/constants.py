@@ -13,12 +13,16 @@ class PanelDefinition:
 
 MAIN_PANEL_NAME = "main"
 ADMIN_PANEL_NAME = "admin"
+STEAM_PANEL_NAME = "steam"
 
 MAIN_PANEL_MARKER_URL = "https://local.discord-roster-bot/panel/main"
 ADMIN_PANEL_MARKER_URL = "https://local.discord-roster-bot/panel/admin"
+STEAM_PANEL_MARKER_URL = "https://local.discord-roster-bot/panel/steam"
 
 MAIN_MESSAGE_IDS_FILENAME = "main_roster_message_ids.json"
 ADMIN_MESSAGE_IDS_FILENAME = "admin_roster_message_ids.json"
+STEAM_MESSAGE_IDS_FILENAME = "steam_roster_message_ids.json"
+STEAM_CACHE_FILENAME = "steam_roster_cache.json"
 
 MAIN_PANEL = PanelDefinition(
     name=MAIN_PANEL_NAME,
@@ -34,7 +38,14 @@ ADMIN_PANEL = PanelDefinition(
     message_ids_filename=ADMIN_MESSAGE_IDS_FILENAME,
 )
 
-PANELS = (MAIN_PANEL, ADMIN_PANEL)
+STEAM_PANEL = PanelDefinition(
+    name=STEAM_PANEL_NAME,
+    title="Список Steam ID XIII",
+    marker_url=STEAM_PANEL_MARKER_URL,
+    message_ids_filename=STEAM_MESSAGE_IDS_FILENAME,
+)
+
+PANELS = (MAIN_PANEL, ADMIN_PANEL, STEAM_PANEL)
 
 EMBED_COLOR = 0x0066FF
 PLACEHOLDER_COLOR = 0x2B2D31

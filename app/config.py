@@ -6,7 +6,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from .constants import ADMIN_MESSAGE_IDS_FILENAME, MAIN_MESSAGE_IDS_FILENAME
+from .constants import (
+    ADMIN_MESSAGE_IDS_FILENAME,
+    MAIN_MESSAGE_IDS_FILENAME,
+    STEAM_CACHE_FILENAME,
+    STEAM_MESSAGE_IDS_FILENAME,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -32,11 +37,16 @@ class Settings:
     server_id: int
     main_list_channel_id: int
     admin_list_channel_id: int
+    steam_list_channel_id: int
     update_debounce_seconds: float
     edit_sleep_seconds: float
     send_sleep_seconds: float
     bootstrap_scan_limit: int
     auto_refresh_seconds: float
+    google_service_account_file: Path | None
+    google_sheet_id: str
+    google_worksheet_name: str | None
+    google_fetch_min_interval_seconds: float
     data_dir: Path
     log_level: str
     main_roles: tuple[int, ...] = field(default_factory=lambda: tuple(MAIN_ROLES))
@@ -54,6 +64,14 @@ class Settings:
     def admin_message_ids_path(self) -> Path:
         return self.data_dir / ADMIN_MESSAGE_IDS_FILENAME
 
+    @property
+    def steam_message_ids_path(self) -> Path:
+        return self.data_dir / STEAM_MESSAGE_IDS_FILENAME
+
+    @property
+    def steam_cache_path(self) -> Path:
+        return self.data_dir / STEAM_CACHE_FILENAME
+
 
 def load_settings() -> Settings:
     load_dotenv(PROJECT_ROOT / ".env")
@@ -67,6 +85,10 @@ def load_settings() -> Settings:
     admin_list_channel_id = _parse_int(
         "ADMIN_LIST_CHANNEL_ID",
         _require_env("ADMIN_LIST_CHANNEL_ID"),
+    )
+    steam_list_channel_id = _parse_int(
+        "STEAM_LIST_CHANNEL_ID",
+        os.getenv("STEAM_LIST_CHANNEL_ID", "1500081418506862754"),
     )
 
     update_debounce_seconds = _parse_non_negative_float(
@@ -89,6 +111,18 @@ def load_settings() -> Settings:
         "AUTO_REFRESH_SECONDS",
         os.getenv("AUTO_REFRESH_SECONDS", "600"),
     )
+    google_fetch_min_interval_seconds = _parse_non_negative_float(
+        "GOOGLE_FETCH_MIN_INTERVAL_SECONDS",
+        os.getenv("GOOGLE_FETCH_MIN_INTERVAL_SECONDS", "60"),
+    )
+
+    google_service_account_file = _resolve_service_account_path(
+        (os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "") or "").strip()
+    )
+    google_sheet_id = (os.getenv("GOOGLE_SHEET_ID", "1SPj41NZ7ws6_5E8rkCy_EgCeDl8oAxI_yttUQiaKbe0") or "").strip()
+    if not google_sheet_id:
+        raise RuntimeError("Environment variable GOOGLE_SHEET_ID must not be empty.")
+    google_worksheet_name = (os.getenv("GOOGLE_WORKSHEET_NAME", "") or "").strip() or None
 
     data_dir_value = (os.getenv("DATA_DIR", "data") or "data").strip()
     data_dir = Path(data_dir_value)
@@ -104,11 +138,16 @@ def load_settings() -> Settings:
         server_id=server_id,
         main_list_channel_id=main_list_channel_id,
         admin_list_channel_id=admin_list_channel_id,
+        steam_list_channel_id=steam_list_channel_id,
         update_debounce_seconds=update_debounce_seconds,
         edit_sleep_seconds=edit_sleep_seconds,
         send_sleep_seconds=send_sleep_seconds,
         bootstrap_scan_limit=bootstrap_scan_limit,
         auto_refresh_seconds=auto_refresh_seconds,
+        google_service_account_file=google_service_account_file,
+        google_sheet_id=google_sheet_id,
+        google_worksheet_name=google_worksheet_name,
+        google_fetch_min_interval_seconds=google_fetch_min_interval_seconds,
         data_dir=data_dir,
         log_level=log_level,
     )
@@ -158,3 +197,21 @@ def _ensure_data_dir_writable(data_dir: Path) -> None:
         raise RuntimeError(
             f"Data directory {data_dir} is not writable. Fix the directory permissions and try again."
         ) from exc
+
+
+def _resolve_service_account_path(raw_value: str) -> Path | None:
+    root_json_files = sorted(PROJECT_ROOT.glob("*.json"))
+
+    if raw_value:
+        configured_path = Path(raw_value)
+        if not configured_path.is_absolute():
+            configured_path = PROJECT_ROOT / configured_path
+        configured_path = configured_path.resolve()
+        if configured_path.exists() or len(root_json_files) != 1:
+            return configured_path
+        return root_json_files[0].resolve()
+
+    if len(root_json_files) == 1:
+        return root_json_files[0].resolve()
+
+    return None

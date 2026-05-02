@@ -1,18 +1,20 @@
 # Discord Roster Bot
 
-This bot maintains two Discord roster panels from live guild roles only:
+This bot maintains three Discord roster panels:
 
-- `Main Roster`
-- `Admin Roster`
+- Main roster
+- Admin roster
+- Steam ID roster
 
-It reads the configured roles from the target server, builds embeds, edits existing panel messages in place, and recovers old panel message IDs from pinned messages or channel history when needed.
+The first two panels still work from live Discord guild roles only. The third panel combines Discord role state with Steam ID64 values from a Google Sheet and a persistent local cache.
 
-## What It Does Not Do
+## What The Bot Does Not Do
 
 - No slash commands
 - No SQLite
 - No join dates
 - No VIP marks
+- No manual admin add/remove/edit commands
 
 ## Required Discord Developer Portal Intent
 
@@ -26,6 +28,96 @@ Enable **Server Members Intent** for the bot application. The bot uses `Intents.
 - Read Message History
 - Manage Messages (optional, but recommended so the bot can pin anchor messages)
 
+## Panels
+
+### Main roster
+
+Built from the configured main roster role priority in `app/config.py`.
+
+### Admin roster
+
+Built from the configured admin roster role priority in `app/config.py`.
+
+### Steam ID roster
+
+Posted to `STEAM_LIST_CHANNEL_ID` and titled `Список Steam ID XIII`.
+
+It shows two sections:
+
+- `Действующие участники`
+- `Исключенные участники`
+
+Every entry is shown as:
+
+```text
+1. <@DISCORD_ID>
+   Steam ID64: `76561198000000000`
+```
+
+The Steam panel uses:
+
+- current Discord guild membership
+- tracked roster roles (`MAIN_ROLES + ADMIN_ROLES`)
+- Google Sheet rows
+- local cache in `data/steam_roster_cache.json`
+
+The main/admin panels remain unchanged.
+
+## Steam Roster Logic
+
+Active means:
+
+- the Discord ID exists in the latest Google Sheet data
+- the member is still in the Discord guild
+- the member currently has at least one tracked roster role
+
+Excluded means the record exists in cache, but at least one of the following is true:
+
+- the Discord ID is missing from the latest Google Sheet data
+- the member is no longer in the guild
+- the member no longer has a tracked roster role
+
+Important behavior:
+
+- cached Steam records are never deleted automatically
+- if a row is removed from the sheet, the user becomes excluded instead of disappearing
+- if a user leaves the guild, they remain visible in excluded if already cached
+- if Google Sheets is temporarily unavailable, the bot continues using the local cache and last known data
+
+## Google Form -> Google Sheet Workflow
+
+Typical flow:
+
+1. A Google Form asks the user for `Discord ID`
+2. The form asks the user for `SteamID64`
+3. Form responses go into the configured Google Sheet
+4. The bot reads the sheet and updates the Steam roster panel
+
+Required Google Sheet columns:
+
+- `discord id`
+- `стим id64`
+
+Header matching is normalized. The bot also supports these header variants:
+
+- `discord_id`
+- `discordid`
+- `steam id64`
+- `steamid64`
+
+## Service Account Setup
+
+1. Create or obtain a Google service account JSON file
+2. Place it in the project root or another path you control
+3. Set `GOOGLE_SERVICE_ACCOUNT_FILE` in `.env`
+4. Share the Google Sheet with the service account email from that JSON file
+
+Important:
+
+- the service account email must have access to the spreadsheet
+- never commit the credentials JSON
+- the bot never logs the credentials contents or private key
+
 ## Configuration
 
 Copy `.env.example` to `.env` and fill in the real values:
@@ -36,6 +128,12 @@ SERVER_ID=put_server_id_here
 
 MAIN_LIST_CHANNEL_ID=put_main_roster_channel_id_here
 ADMIN_LIST_CHANNEL_ID=put_admin_roster_channel_id_here
+STEAM_LIST_CHANNEL_ID=1500081418506862754
+
+GOOGLE_SERVICE_ACCOUNT_FILE=service-account.json
+GOOGLE_SHEET_ID=1SPj41NZ7ws6_5E8rkCy_EgCeDl8oAxI_yttUQiaKbe0
+GOOGLE_WORKSHEET_NAME=
+GOOGLE_FETCH_MIN_INTERVAL_SECONDS=60
 
 UPDATE_DEBOUNCE_SECONDS=5
 EDIT_SLEEP_SECONDS=0.55
@@ -46,14 +144,22 @@ DATA_DIR=data
 LOG_LEVEL=INFO
 ```
 
-Required variables:
+Required core variables:
 
 - `DISCORD_TOKEN`
 - `SERVER_ID`
 - `MAIN_LIST_CHANNEL_ID`
 - `ADMIN_LIST_CHANNEL_ID`
 
-Optional variables:
+Steam/Google variables:
+
+- `STEAM_LIST_CHANNEL_ID`
+- `GOOGLE_SERVICE_ACCOUNT_FILE`
+- `GOOGLE_SHEET_ID`
+- `GOOGLE_WORKSHEET_NAME`
+- `GOOGLE_FETCH_MIN_INTERVAL_SECONDS`
+
+Optional runtime variables:
 
 - `UPDATE_DEBOUNCE_SECONDS`
 - `EDIT_SLEEP_SECONDS`
@@ -62,6 +168,8 @@ Optional variables:
 - `AUTO_REFRESH_SECONDS`
 - `DATA_DIR`
 - `LOG_LEVEL`
+
+If `GOOGLE_WORKSHEET_NAME` is empty, the bot reads the first worksheet.
 
 ## Role Order
 
@@ -81,35 +189,40 @@ Admin roster priority, top to bottom:
 2. `1498091840899911690`
 3. `1498091694456049994`
 
-Role block titles come from the actual Discord role names. The names are not hardcoded.
+Role block titles come from the actual Discord role names. Names are not hardcoded.
 
 ## Duplicate Role Handling
 
-Each panel is processed independently.
+Each Discord roster panel is processed independently.
 
-- If a member has multiple roles inside the **main** roster, they appear once under the highest-priority main role.
-- If a member has multiple roles inside the **admin** roster, they appear once under the highest-priority admin role.
-- If a member has at least one main role and at least one admin role, they may appear in both panels.
+- If a member has multiple roles inside the main roster, they appear once under the highest-priority main role
+- If a member has multiple roles inside the admin roster, they appear once under the highest-priority admin role
+- If a member has at least one main role and at least one admin role, they may appear in both panels
 
 Members inside each role block are sorted by:
 
 1. `display_name.lower()`
 2. `user.id`
 
-## How Message Recovery Works
+## Message Recovery And Persistence
 
 The bot stores message IDs in JSON files inside `DATA_DIR`:
 
 - `main_roster_message_ids.json`
 - `admin_roster_message_ids.json`
+- `steam_roster_message_ids.json`
 
-Writes are atomic. On startup or later updates, if a JSON file is missing or empty, the bot recovers the message IDs by:
+The Steam cache is stored in:
 
-1. Checking pinned messages in the panel channel
-2. Falling back to recent channel history up to `BOOTSTRAP_SCAN_LIMIT`
-3. Matching only messages authored by the bot and tagged with the panel marker in `embed.author.url`
+- `steam_roster_cache.json`
 
-If a stored message was deleted, the bot sends a replacement and updates the JSON file. If there are extra old stored messages, it converts them to a neutral placeholder embed instead of deleting them.
+Writes are atomic. If a message ID file is missing or empty, the bot recovers panel messages by:
+
+1. checking pinned messages in the target channel
+2. falling back to recent channel history up to `BOOTSTRAP_SCAN_LIMIT`
+3. matching only bot-authored messages with the panel marker in `embed.author.url`
+
+If a stored message was deleted, the bot recreates it and updates the JSON file. If extra old messages remain, the bot replaces them with a neutral placeholder embed instead of deleting them.
 
 ## Running Locally
 
@@ -143,7 +256,7 @@ Run the bot:
 python run.py
 ```
 
-## Running on a VPS with systemd
+## Running On A VPS With systemd
 
 An example unit file is available at `systemd/discord-roster-bot.service.example`.
 
@@ -157,9 +270,10 @@ Typical deployment flow:
 6. Run `sudo systemctl daemon-reload`
 7. Run `sudo systemctl enable --now discord-roster-bot`
 
-## Changing Role IDs or Channel IDs
+## Changing Role IDs, Channels, Or Google Settings
 
-- Update the tracked role ID lists in `app/config.py`
-- Update `.env` for `MAIN_LIST_CHANNEL_ID` and `ADMIN_LIST_CHANNEL_ID`
+- Update tracked role lists in `app/config.py`
+- Update `.env` for `MAIN_LIST_CHANNEL_ID`, `ADMIN_LIST_CHANNEL_ID`, and `STEAM_LIST_CHANNEL_ID`
+- Update `.env` for `GOOGLE_SERVICE_ACCOUNT_FILE`, `GOOGLE_SHEET_ID`, and `GOOGLE_WORKSHEET_NAME`
 
-The two channels may be different or the same channel. The bot keeps the panels separate by using different marker URLs and different JSON files.
+The main/admin Discord roster logic stays the same. The Steam panel is an additional third panel layered on top of the existing bot behavior.

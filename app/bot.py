@@ -5,11 +5,13 @@ import logging
 import discord
 
 from .config import Settings
-from .constants import ADMIN_PANEL, MAIN_PANEL
+from .constants import ADMIN_PANEL, MAIN_PANEL, STEAM_PANEL
 from .services.embed_builder import EmbedBuilder
+from .services.google_sheets_service import GoogleSheetsService
 from .services.message_store import MessageStore
 from .services.roster_service import RosterService
-from .services.update_scheduler import PanelTarget, UpdateScheduler
+from .services.steam_roster_service import SteamRosterService
+from .services.update_scheduler import PanelTarget, SteamPanelTarget, UpdateScheduler
 
 
 class RosterBot(discord.Client):
@@ -23,6 +25,18 @@ class RosterBot(discord.Client):
         self._ready_once = False
 
         self._roster_service = RosterService(logging.getLogger("discord_roster_bot.roster_service"))
+        self._google_sheets_service = GoogleSheetsService(
+            logger=logging.getLogger("discord_roster_bot.google_sheets_service"),
+            service_account_file=settings.google_service_account_file,
+            sheet_id=settings.google_sheet_id,
+            worksheet_name=settings.google_worksheet_name,
+            fetch_min_interval_seconds=settings.google_fetch_min_interval_seconds,
+        )
+        self._steam_roster_service = SteamRosterService(
+            logger=logging.getLogger("discord_roster_bot.steam_roster_service"),
+            cache_path=settings.steam_cache_path,
+            google_sheets_service=self._google_sheets_service,
+        )
         self._embed_builder = EmbedBuilder()
         self._message_store = MessageStore(
             logger=logging.getLogger("discord_roster_bot.message_store"),
@@ -49,11 +63,13 @@ class RosterBot(discord.Client):
 
             main_channel = self._resolve_text_channel(guild, self.settings.main_list_channel_id, "main roster")
             admin_channel = self._resolve_text_channel(guild, self.settings.admin_list_channel_id, "admin roster")
+            steam_channel = self._resolve_text_channel(guild, self.settings.steam_list_channel_id, "steam roster")
 
             self.logger.info(
-                "Validated roster channels: main=%s, admin=%s.",
+                "Validated roster channels: main=%s, admin=%s, steam=%s.",
                 main_channel.id,
                 admin_channel.id,
+                steam_channel.id,
             )
 
             if self.user is None:
@@ -77,9 +93,16 @@ class RosterBot(discord.Client):
                         role_ids=self.settings.admin_roles,
                     ),
                 ),
+                steam_panel_target=SteamPanelTarget(
+                    definition=STEAM_PANEL,
+                    channel=steam_channel,
+                    message_ids_path=self.settings.steam_message_ids_path,
+                ),
                 roster_service=self._roster_service,
+                steam_roster_service=self._steam_roster_service,
                 embed_builder=self._embed_builder,
                 message_store=self._message_store,
+                tracked_role_ids=self.settings.tracked_role_ids,
                 debounce_seconds=self.settings.update_debounce_seconds,
                 auto_refresh_seconds=self.settings.auto_refresh_seconds,
             )

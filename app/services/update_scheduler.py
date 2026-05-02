@@ -13,6 +13,7 @@ from ..constants import PanelDefinition
 from .embed_builder import EmbedBuilder
 from .message_store import MessageStore
 from .roster_service import RosterService
+from .steam_roster_service import SteamRosterService
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +24,13 @@ class PanelTarget:
     role_ids: tuple[int, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class SteamPanelTarget:
+    definition: PanelDefinition
+    channel: discord.TextChannel
+    message_ids_path: Path
+
+
 class UpdateScheduler:
     def __init__(
         self,
@@ -31,9 +39,12 @@ class UpdateScheduler:
         guild: discord.Guild,
         bot_user_id: int,
         panel_targets: Sequence[PanelTarget],
+        steam_panel_target: SteamPanelTarget | None,
         roster_service: RosterService,
+        steam_roster_service: SteamRosterService | None,
         embed_builder: EmbedBuilder,
         message_store: MessageStore,
+        tracked_role_ids: frozenset[int],
         debounce_seconds: float,
         auto_refresh_seconds: float,
     ) -> None:
@@ -41,9 +52,12 @@ class UpdateScheduler:
         self._guild = guild
         self._bot_user_id = bot_user_id
         self._panel_targets = tuple(panel_targets)
+        self._steam_panel_target = steam_panel_target
         self._roster_service = roster_service
+        self._steam_roster_service = steam_roster_service
         self._embed_builder = embed_builder
         self._message_store = message_store
+        self._tracked_role_ids = tracked_role_ids
         self._debounce_seconds = debounce_seconds
         self._auto_refresh_seconds = auto_refresh_seconds
         self._update_lock = asyncio.Lock()
@@ -56,6 +70,13 @@ class UpdateScheduler:
                 channel=target.channel,
                 file_path=target.message_ids_path,
                 marker_url=target.definition.marker_url,
+                bot_user_id=self._bot_user_id,
+            )
+        if self._steam_panel_target is not None:
+            await self._message_store.bootstrap_message_ids(
+                channel=self._steam_panel_target.channel,
+                file_path=self._steam_panel_target.message_ids_path,
+                marker_url=self._steam_panel_target.definition.marker_url,
                 bot_user_id=self._bot_user_id,
             )
 
@@ -81,6 +102,13 @@ class UpdateScheduler:
                 except Exception:
                     had_errors = True
                     self._logger.exception("Failed to update the %s panel.", target.definition.name)
+
+            if self._steam_panel_target is not None and self._steam_roster_service is not None:
+                try:
+                    await self._update_steam_panel(self._steam_panel_target, trigger=trigger)
+                except Exception:
+                    had_errors = True
+                    self._logger.exception("Failed to update the %s panel.", self._steam_panel_target.definition.name)
 
             elapsed = time.perf_counter() - started_at
             if had_errors:
@@ -131,6 +159,29 @@ class UpdateScheduler:
             snapshot=snapshot,
         )
 
+        await self._message_store.update_panel_messages(
+            channel=target.channel,
+            embeds=embeds,
+            file_path=target.message_ids_path,
+            marker_url=target.definition.marker_url,
+            bot_user_id=self._bot_user_id,
+            pin_reason=f"Discord roster bot anchor ({target.definition.name})",
+        )
+
+    async def _update_steam_panel(self, target: SteamPanelTarget, *, trigger: str) -> None:
+        if self._steam_roster_service is None:
+            return
+
+        snapshot = await self._steam_roster_service.build_snapshot(
+            guild=self._guild,
+            tracked_role_ids=self._tracked_role_ids,
+            force_sheet_fetch=trigger == "startup",
+        )
+        embeds = self._embed_builder.build_steam_panel_embeds(
+            panel_title=target.definition.title,
+            marker_url=target.definition.marker_url,
+            snapshot=snapshot,
+        )
         await self._message_store.update_panel_messages(
             channel=target.channel,
             embeds=embeds,
