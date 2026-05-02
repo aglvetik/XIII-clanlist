@@ -22,12 +22,16 @@ class GoogleSheetsService:
         service_account_file: Path | None,
         sheet_id: str,
         worksheet_name: str | None,
+        steam_id_column_name: str,
+        discord_id_column_name: str,
         fetch_min_interval_seconds: float,
     ) -> None:
         self._logger = logger
         self._service_account_file = service_account_file
         self._sheet_id = sheet_id
         self._worksheet_name = worksheet_name
+        self._steam_id_column_name = steam_id_column_name
+        self._discord_id_column_name = discord_id_column_name
         self._fetch_min_interval_seconds = fetch_min_interval_seconds
         self._client: gspread.Client | None = None
         self._last_fetch_monotonic: float | None = None
@@ -83,8 +87,16 @@ class GoogleSheetsService:
             return {}
 
         header_row = values[0]
-        discord_index = self._find_required_column(header_row, DISCORD_HEADER_ALIASES, "discord id")
-        steam_index = self._find_required_column(header_row, STEAM_HEADER_ALIASES, "стим id64 / steam id64")
+        discord_index = self._find_column(header_row, DISCORD_HEADER_ALIASES)
+        steam_index = self._find_column(header_row, STEAM_HEADER_ALIASES)
+        if discord_index is None or steam_index is None:
+            steam_index = self._column_name_to_index(self._steam_id_column_name)
+            discord_index = self._column_name_to_index(self._discord_id_column_name)
+            self._logger.warning(
+                "Не найдены обязательные заголовки Google Sheets. Используется fallback по колонкам %s/%s.",
+                self._steam_id_column_name,
+                self._discord_id_column_name,
+            )
 
         mapping: dict[str, str] = {}
         for row_number, row in enumerate(values[1:], start=2):
@@ -107,16 +119,25 @@ class GoogleSheetsService:
         return mapping
 
     @staticmethod
-    def _find_required_column(headers: list[str], aliases: set[str], display_name: str) -> int:
+    def _find_column(headers: list[str], aliases: set[str]) -> int | None:
         for index, header in enumerate(headers):
             if GoogleSheetsService.normalize_header(header) in aliases:
                 return index
-        raise RuntimeError(f"В Google Sheets не найден обязательный столбец: {display_name}")
+        return None
 
     @staticmethod
     def normalize_header(value: str) -> str:
         normalized = value.strip().lower().replace("_", " ")
         return " ".join(normalized.split())
+
+    @staticmethod
+    def _column_name_to_index(column_name: str) -> int:
+        result = 0
+        for char in column_name.upper():
+            if not ("A" <= char <= "Z"):
+                raise RuntimeError(f"Некорректное имя колонки Google Sheets: {column_name}")
+            result = (result * 26) + (ord(char) - ord("A") + 1)
+        return result - 1
 
     @staticmethod
     def normalize_discord_id(value: str) -> str | None:

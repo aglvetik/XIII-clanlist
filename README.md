@@ -105,6 +105,13 @@ Header matching is normalized. The bot also supports these header variants:
 - `steam id64`
 - `steamid64`
 
+If the headers are not found, the bot falls back to fixed sheet columns:
+
+- `GOOGLE_STEAM_ID_COLUMN` default: `D`
+- `GOOGLE_DISCORD_ID_COLUMN` default: `E`
+
+In fallback mode the first row is still treated as the header row and data is read from row 2 onward.
+
 ## Service Account Setup
 
 1. Create or obtain a Google service account JSON file
@@ -133,6 +140,8 @@ STEAM_LIST_CHANNEL_ID=1500081418506862754
 GOOGLE_SERVICE_ACCOUNT_FILE=service-account.json
 GOOGLE_SHEET_ID=1SPj41NZ7ws6_5E8rkCy_EgCeDl8oAxI_yttUQiaKbe0
 GOOGLE_WORKSHEET_NAME=
+GOOGLE_STEAM_ID_COLUMN=D
+GOOGLE_DISCORD_ID_COLUMN=E
 GOOGLE_FETCH_MIN_INTERVAL_SECONDS=60
 
 UPDATE_DEBOUNCE_SECONDS=5
@@ -157,6 +166,8 @@ Steam/Google variables:
 - `GOOGLE_SERVICE_ACCOUNT_FILE`
 - `GOOGLE_SHEET_ID`
 - `GOOGLE_WORKSHEET_NAME`
+- `GOOGLE_STEAM_ID_COLUMN`
+- `GOOGLE_DISCORD_ID_COLUMN`
 - `GOOGLE_FETCH_MIN_INTERVAL_SECONDS`
 
 Optional runtime variables:
@@ -275,5 +286,6 @@ Typical deployment flow:
 - Update tracked role lists in `app/config.py`
 - Update `.env` for `MAIN_LIST_CHANNEL_ID`, `ADMIN_LIST_CHANNEL_ID`, and `STEAM_LIST_CHANNEL_ID`
 - Update `.env` for `GOOGLE_SERVICE_ACCOUNT_FILE`, `GOOGLE_SHEET_ID`, and `GOOGLE_WORKSHEET_NAME`
+- Update `.env` for `GOOGLE_STEAM_ID_COLUMN` and `GOOGLE_DISCORD_ID_COLUMN` if your sheet needs fixed-column fallback
 
 The main/admin Discord roster logic stays the same. The Steam panel is an additional third panel layered on top of the existing bot behavior.

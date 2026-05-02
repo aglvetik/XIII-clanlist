@@ -30,6 +30,8 @@ class RosterBot(discord.Client):
             service_account_file=settings.google_service_account_file,
             sheet_id=settings.google_sheet_id,
             worksheet_name=settings.google_worksheet_name,
+            steam_id_column_name=settings.google_steam_id_column,
+            discord_id_column_name=settings.google_discord_id_column,
             fetch_min_interval_seconds=settings.google_fetch_min_interval_seconds,
         )
         self._steam_roster_service = SteamRosterService(

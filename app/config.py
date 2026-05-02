@@ -46,6 +46,8 @@ class Settings:
     google_service_account_file: Path | None
     google_sheet_id: str
     google_worksheet_name: str | None
+    google_steam_id_column: str
+    google_discord_id_column: str
     google_fetch_min_interval_seconds: float
     data_dir: Path
     log_level: str
@@ -123,6 +125,14 @@ def load_settings() -> Settings:
     if not google_sheet_id:
         raise RuntimeError("Environment variable GOOGLE_SHEET_ID must not be empty.")
     google_worksheet_name = (os.getenv("GOOGLE_WORKSHEET_NAME", "") or "").strip() or None
+    google_steam_id_column = _parse_sheet_column_name(
+        "GOOGLE_STEAM_ID_COLUMN",
+        os.getenv("GOOGLE_STEAM_ID_COLUMN", "D"),
+    )
+    google_discord_id_column = _parse_sheet_column_name(
+        "GOOGLE_DISCORD_ID_COLUMN",
+        os.getenv("GOOGLE_DISCORD_ID_COLUMN", "E"),
+    )
 
     data_dir_value = (os.getenv("DATA_DIR", "data") or "data").strip()
     data_dir = Path(data_dir_value)
@@ -147,6 +157,8 @@ def load_settings() -> Settings:
         google_service_account_file=google_service_account_file,
         google_sheet_id=google_sheet_id,
         google_worksheet_name=google_worksheet_name,
+        google_steam_id_column=google_steam_id_column,
+        google_discord_id_column=google_discord_id_column,
         google_fetch_min_interval_seconds=google_fetch_min_interval_seconds,
         data_dir=data_dir,
         log_level=log_level,
@@ -181,6 +193,15 @@ def _parse_non_negative_float(name: str, value: str) -> float:
         raise RuntimeError(f"Environment variable {name} must be a number.") from exc
     if parsed < 0:
         raise RuntimeError(f"Environment variable {name} must be zero or greater.")
+    return parsed
+
+
+def _parse_sheet_column_name(name: str, value: str) -> str:
+    parsed = value.strip().upper()
+    if not parsed or not parsed.isalpha():
+        raise RuntimeError(
+            f"Environment variable {name} must be a spreadsheet column name like D or AA."
+        )
     return parsed
 
 
