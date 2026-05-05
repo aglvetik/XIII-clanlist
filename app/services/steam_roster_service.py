@@ -61,7 +61,6 @@ class SteamRosterService:
 
         active_entries: list[SteamRosterEntry] = []
         excluded_entries: list[SteamRosterEntry] = []
-        latest_sheet_ids = set(latest_sheet_mapping) if latest_sheet_mapping is not None else None
 
         for discord_id, record in cache["records"].items():
             try:
@@ -77,11 +76,10 @@ class SteamRosterService:
             if member is not None:
                 record["last_display_name"] = member.display_name
 
-            in_sheet_now = self._is_in_sheet_now(record, latest_sheet_ids)
             has_steam_active_role = member is not None and any(
                 role.id == steam_active_role_id for role in member.roles
             )
-            status = "active" if in_sheet_now and member is not None and has_steam_active_role else "excluded"
+            status = "active" if member is not None and has_steam_active_role else "excluded"
 
             if status == "active":
                 record["last_seen_active_at"] = now
@@ -177,13 +175,6 @@ class SteamRosterService:
             os.fsync(handle.fileno())
 
         os.replace(tmp_path, self._cache_path)
-
-    @staticmethod
-    def _is_in_sheet_now(record: dict[str, object], latest_sheet_ids: set[str] | None) -> bool:
-        if latest_sheet_ids is None:
-            return record.get("last_status") == "active"
-        discord_id = str(record.get("discord_id", "")).strip()
-        return discord_id in latest_sheet_ids
 
     @staticmethod
     def _entry_sort_key(entry: SteamRosterEntry) -> tuple[str, int]:

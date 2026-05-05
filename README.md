@@ -58,7 +58,7 @@ The Steam panel uses:
 
 - current Discord guild membership
 - dedicated active role `STEAM_ACTIVE_ROLE_ID`
-- Google Sheet rows
+- Google Sheet rows as a data source for Discord ID -> SteamID64 discovery and updates
 - local cache in `data/steam_roster_cache.json`
 
 The main/admin panels remain unchanged.
@@ -67,21 +67,21 @@ The main/admin panels remain unchanged.
 
 Active means:
 
-- the Discord ID exists in the latest Google Sheet data
 - the member is still in the Discord guild
 - the member currently has role `STEAM_ACTIVE_ROLE_ID`
 
 Excluded means the record exists in cache, but at least one of the following is true:
 
-- the Discord ID is missing from the latest Google Sheet data
 - the member is no longer in the guild
 - the member does not have role `STEAM_ACTIVE_ROLE_ID`
 
 Important behavior:
 
 - cached Steam records are never deleted automatically
-- if a row is removed from the sheet, the user becomes excluded instead of disappearing
+- if a row is removed from the sheet, the user stays visible from cache
+- if a cached user still has `STEAM_ACTIVE_ROLE_ID`, they remain active even when removed from the sheet
 - if a user leaves the guild, they remain visible in excluded if already cached
+- the Google Sheet does not decide active/excluded status after a record is cached
 - if Google Sheets is temporarily unavailable, the bot continues using the local cache and last known data
 
 ## Google Form -> Google Sheet Workflow
