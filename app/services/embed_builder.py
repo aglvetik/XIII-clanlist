@@ -198,9 +198,9 @@ class EmbedBuilder:
 
         for index, entry in enumerate(entries, start=1):
             formatted_entry = f"{index}. <@{entry.discord_id}>\n   Steam ID64: `{entry.steam_id64}`"
-            extra_length = len(formatted_entry) if not current_entries else len(formatted_entry) + 2
+            extra_length = len(formatted_entry) if not current_entries else len(formatted_entry) + 1
             if current_entries and current_length + extra_length > limit:
-                yield "\n\n".join(current_entries)
+                yield "\n".join(current_entries)
                 current_entries = [formatted_entry]
                 current_length = len(formatted_entry)
                 continue
@@ -209,7 +209,7 @@ class EmbedBuilder:
             current_length += extra_length
 
         if current_entries:
-            description = "\n\n".join(current_entries)
+            description = "\n".join(current_entries)
             if len(description) > MAX_EMBED_TOTAL_LENGTH:
                 raise ValueError("Generated Steam roster block exceeds Discord embed limits.")
             yield description

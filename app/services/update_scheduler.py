@@ -44,7 +44,7 @@ class UpdateScheduler:
         steam_roster_service: SteamRosterService | None,
         embed_builder: EmbedBuilder,
         message_store: MessageStore,
-        tracked_role_ids: frozenset[int],
+        steam_active_role_id: int,
         debounce_seconds: float,
         auto_refresh_seconds: float,
     ) -> None:
@@ -57,7 +57,7 @@ class UpdateScheduler:
         self._steam_roster_service = steam_roster_service
         self._embed_builder = embed_builder
         self._message_store = message_store
-        self._tracked_role_ids = tracked_role_ids
+        self._steam_active_role_id = steam_active_role_id
         self._debounce_seconds = debounce_seconds
         self._auto_refresh_seconds = auto_refresh_seconds
         self._update_lock = asyncio.Lock()
@@ -174,7 +174,7 @@ class UpdateScheduler:
 
         snapshot = await self._steam_roster_service.build_snapshot(
             guild=self._guild,
-            tracked_role_ids=self._tracked_role_ids,
+            steam_active_role_id=self._steam_active_role_id,
             force_sheet_fetch=trigger == "startup",
         )
         embeds = self._embed_builder.build_steam_panel_embeds(

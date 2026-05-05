@@ -57,7 +57,7 @@ Every entry is shown as:
 The Steam panel uses:
 
 - current Discord guild membership
-- tracked roster roles (`MAIN_ROLES + ADMIN_ROLES`)
+- dedicated active role `STEAM_ACTIVE_ROLE_ID`
 - Google Sheet rows
 - local cache in `data/steam_roster_cache.json`
 
@@ -69,13 +69,13 @@ Active means:
 
 - the Discord ID exists in the latest Google Sheet data
 - the member is still in the Discord guild
-- the member currently has at least one tracked roster role
+- the member currently has role `STEAM_ACTIVE_ROLE_ID`
 
 Excluded means the record exists in cache, but at least one of the following is true:
 
 - the Discord ID is missing from the latest Google Sheet data
 - the member is no longer in the guild
-- the member no longer has a tracked roster role
+- the member does not have role `STEAM_ACTIVE_ROLE_ID`
 
 Important behavior:
 
@@ -136,6 +136,7 @@ SERVER_ID=put_server_id_here
 MAIN_LIST_CHANNEL_ID=put_main_roster_channel_id_here
 ADMIN_LIST_CHANNEL_ID=put_admin_roster_channel_id_here
 STEAM_LIST_CHANNEL_ID=1500081418506862754
+STEAM_ACTIVE_ROLE_ID=1498022112114249827
 
 GOOGLE_SERVICE_ACCOUNT_FILE=service-account.json
 GOOGLE_SHEET_ID=1SPj41NZ7ws6_5E8rkCy_EgCeDl8oAxI_yttUQiaKbe0
@@ -163,6 +164,7 @@ Required core variables:
 Steam/Google variables:
 
 - `STEAM_LIST_CHANNEL_ID`
+- `STEAM_ACTIVE_ROLE_ID`
 - `GOOGLE_SERVICE_ACCOUNT_FILE`
 - `GOOGLE_SHEET_ID`
 - `GOOGLE_WORKSHEET_NAME`
@@ -285,6 +287,7 @@ Typical deployment flow:
 
 - Update tracked role lists in `app/config.py`
 - Update `.env` for `MAIN_LIST_CHANNEL_ID`, `ADMIN_LIST_CHANNEL_ID`, and `STEAM_LIST_CHANNEL_ID`
+- Update `.env` for `STEAM_ACTIVE_ROLE_ID` to control who is active in the Steam panel
 - Update `.env` for `GOOGLE_SERVICE_ACCOUNT_FILE`, `GOOGLE_SHEET_ID`, and `GOOGLE_WORKSHEET_NAME`
 - Update `.env` for `GOOGLE_STEAM_ID_COLUMN` and `GOOGLE_DISCORD_ID_COLUMN` if your sheet needs fixed-column fallback
 

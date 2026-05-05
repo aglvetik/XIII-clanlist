@@ -104,7 +104,7 @@ class RosterBot(discord.Client):
                 steam_roster_service=self._steam_roster_service,
                 embed_builder=self._embed_builder,
                 message_store=self._message_store,
-                tracked_role_ids=self.settings.tracked_role_ids,
+                steam_active_role_id=self.settings.steam_active_role_id,
                 debounce_seconds=self.settings.update_debounce_seconds,
                 auto_refresh_seconds=self.settings.auto_refresh_seconds,
             )
@@ -121,8 +121,8 @@ class RosterBot(discord.Client):
         if before.guild.id != self.settings.server_id:
             return
 
-        relevant_before = {role.id for role in before.roles if role.id in self.settings.tracked_role_ids}
-        relevant_after = {role.id for role in after.roles if role.id in self.settings.tracked_role_ids}
+        relevant_before = {role.id for role in before.roles if role.id in self.settings.event_role_ids}
+        relevant_after = {role.id for role in after.roles if role.id in self.settings.event_role_ids}
         if relevant_before == relevant_after:
             return
 
@@ -139,7 +139,7 @@ class RosterBot(discord.Client):
     async def on_guild_role_update(self, before: discord.Role, after: discord.Role) -> None:
         if before.guild.id != self.settings.server_id:
             return
-        if before.id not in self.settings.tracked_role_ids:
+        if before.id not in self.settings.event_role_ids:
             return
         if before.name == after.name:
             return

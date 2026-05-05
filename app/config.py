@@ -38,6 +38,7 @@ class Settings:
     main_list_channel_id: int
     admin_list_channel_id: int
     steam_list_channel_id: int
+    steam_active_role_id: int
     update_debounce_seconds: float
     edit_sleep_seconds: float
     send_sleep_seconds: float
@@ -57,6 +58,10 @@ class Settings:
     @property
     def tracked_role_ids(self) -> frozenset[int]:
         return frozenset((*self.main_roles, *self.admin_roles))
+
+    @property
+    def event_role_ids(self) -> frozenset[int]:
+        return frozenset((*self.main_roles, *self.admin_roles, self.steam_active_role_id))
 
     @property
     def main_message_ids_path(self) -> Path:
@@ -91,6 +96,10 @@ def load_settings() -> Settings:
     steam_list_channel_id = _parse_int(
         "STEAM_LIST_CHANNEL_ID",
         os.getenv("STEAM_LIST_CHANNEL_ID", "1500081418506862754"),
+    )
+    steam_active_role_id = _parse_int(
+        "STEAM_ACTIVE_ROLE_ID",
+        os.getenv("STEAM_ACTIVE_ROLE_ID", "1498022112114249827"),
     )
 
     update_debounce_seconds = _parse_non_negative_float(
@@ -149,6 +158,7 @@ def load_settings() -> Settings:
         main_list_channel_id=main_list_channel_id,
         admin_list_channel_id=admin_list_channel_id,
         steam_list_channel_id=steam_list_channel_id,
+        steam_active_role_id=steam_active_role_id,
         update_debounce_seconds=update_debounce_seconds,
         edit_sleep_seconds=edit_sleep_seconds,
         send_sleep_seconds=send_sleep_seconds,

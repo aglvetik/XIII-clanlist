@@ -42,7 +42,7 @@ class SteamRosterService:
         self,
         *,
         guild: discord.Guild,
-        tracked_role_ids: frozenset[int],
+        steam_active_role_id: int,
         force_sheet_fetch: bool = False,
     ) -> SteamRosterSnapshot:
         cache = self._load_cache()
@@ -78,8 +78,10 @@ class SteamRosterService:
                 record["last_display_name"] = member.display_name
 
             in_sheet_now = self._is_in_sheet_now(record, latest_sheet_ids)
-            has_tracked_role = member is not None and any(role.id in tracked_role_ids for role in member.roles)
-            status = "active" if in_sheet_now and member is not None and has_tracked_role else "excluded"
+            has_steam_active_role = member is not None and any(
+                role.id == steam_active_role_id for role in member.roles
+            )
+            status = "active" if in_sheet_now and member is not None and has_steam_active_role else "excluded"
 
             if status == "active":
                 record["last_seen_active_at"] = now
